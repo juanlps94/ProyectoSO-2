@@ -1,1 +1,1 @@
-Bronze
+Hello, World!

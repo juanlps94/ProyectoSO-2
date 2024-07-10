@@ -17,16 +17,50 @@ typedef struct
     stats_t stats;
 }args;
 
-// Función que ejecutaran los hilos "Trabajadores"
-void * ordenamiento(){
+void reservarMemoria(char ** cadena, int n){
+    int it=0;
+    while (it < 10*n)
+    {
+        cadena[it] = (char *) malloc (sizeof(char) * 1024);    // Reservamos memoria para cada string individual
+        it++;
+    }
+}
 
+// Función que ejecutaran los hilos "Trabajadores"
+void * ordenamiento(void * argumentos){
+    args infoArchivo = *(args *) argumentos;
+
+    char ** cadenas = (char **) malloc(sizeof (char *) * 10);     // Reservamos memoria para strings de 10 en 10
+    int count = 1;
+    reservarMemoria(cadenas, count);
+    
+    char line[1024];    // Para guardar cada string
+
+    FILE * archivo = fopen( infoArchivo.nombre, "r");
+
+    int it = 0;
+    fgets(line, 1024,archivo);
+    if (line == NULL){
+        printf("Archivo vacio.\n");
+        pthread_exit(NULL);
+    }
+
+    do
+    {  
+        printf("%s\n", line);
+        strcpy(cadenas[0], line);
+    } while ( fgets(line, 1024,archivo));
+    
+    free(cadenas);
+    
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
     if (argc < 3){
-        printf("Error: Muy pocos arguentos.\n");
+        printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
     }
