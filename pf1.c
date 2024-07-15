@@ -18,7 +18,7 @@ typedef struct
 }args;
 
 void reservarMemoria(char ** cadena, int n){
-    int it=0;
+    int it = 10*n - 10;     // Comezando desde el primer elemento del n-esimo bloque de 10
     while (it < 10*n)
     {
         cadena[it] = (char *) malloc (sizeof(char) * 1024);    // Reservamos memoria para cada string individual
@@ -31,6 +31,7 @@ void * ordenamiento(void * argumentos){
     args infoArchivo = *(args *) argumentos;
 
     char ** cadenas = (char **) malloc(sizeof (char *) * 10);     // Reservamos memoria para strings de 10 en 10
+    char ** cadenas2;
     int count = 1;
     reservarMemoria(cadenas, count);
     
@@ -38,17 +39,26 @@ void * ordenamiento(void * argumentos){
 
     FILE * archivo = fopen( infoArchivo.nombre, "r");
 
-    int it = 0;
     fgets(line, 1024,archivo);
     if (line == NULL){
         printf("Archivo vacio.\n");
         pthread_exit(NULL);
     }
 
+    int it = 0;
     do
-    {  
+    {   
         printf("%s\n", line);
         strcpy(cadenas[0], line);
+        it++;
+        if (it >= 10){
+            it = 0;
+            count++;
+            cadenas2 = (char **) realloc(cadenas, count*10);
+            cadenas = cadenas2; 
+            reservarMemoria(cadenas, count);
+        }
+            
     } while ( fgets(line, 1024,archivo));
     
     free(cadenas);
