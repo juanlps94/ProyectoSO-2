@@ -67,39 +67,44 @@ void * ordenamiento(void * argumentos){
 }
 
 
-int Comprobarlinea(char * nombre){
+void * Comprobarlinea(char * nombre, int * arr){
     int cont=0;
     char caracter;  // Tamaño suficiente para la mayoría de las líneas
-
+    int i=0;
+    int* arrAux = arr;
+    char ch;
     FILE *fp;
-    fp = fopen(nombre, "r");
+    fp = fopen(nombre, "r");        
         if (fp == NULL) {
             printf("Error al abrir el archivo: %s\n", nombre);
-            return 1;
+            exit(1);
         }
 
-        if (fgetc(fp) == EOF) {
-        printf("Error al leer la primera letra del archivo.\n");
-        return 0;
-        } else {
-            do
-            {
-                cont++;
-            } while (fgetc(fp) != EOF);
+        while ((ch = fgetc(fp)) != EOF){
+            
+            if ((ch == '\n') || (ch == EOF)) {
+                if(cont!=0){
+                arrAux[i]=cont;
+                cont=0;
+                i++;
+                }
+            } else {
+                    cont++;   
+            }
         }
-        
+        arrAux[i]=cont;
+       
   fclose(fp);
-    return cont;
 }
 
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
-   /* if (argc < 3){
+   if (argc < 2){
         printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
-    }*/
+    }
     stats_t stats[argc - 1]; // Por defecto
 
     int cant_archivos =  argc - 1;
@@ -111,22 +116,38 @@ int main(int argc, char *argv[])
         strcpy(archivo[i].nombre, argv[i+1]); 
     }
     
-    int contador = Comprobarlinea(archivo[1].nombre);
-    printf("El numero de caracteres es %d\n" ,contador);
+    int arr[1024]={}; 
+    Comprobarlinea(archivo[0].nombre, arr);
 
+    for (int i = 0; arr[i]!=0; i++){
+        printf("Linea %d leida y son %d caracteres\n",i,arr[i]);
+    }
+    int max=arr[0];
+    int min=arr[0];
+
+    for (int i = 1; arr[i]!=0; i++){
+        if(arr[i]>max) 
+            max = arr[i];
+        
+        if(arr[i]<min) 
+            min = arr[i];
+    }
+
+    printf("el valor max es %d\n",max);
+    printf("el valor min es %d\n",min);
 
    
-    char line[contador];    // Para guardar cada string
+    /*char line[contador+1];    // Para guardar cada string
     FILE * arch = fopen( archivo[1].nombre, "r");
 
-    fgets(line, contador,arch);
+    fgets(line, contador+1,arch);
     if (line == NULL){
         printf("Archivo vacio.\n");
     }
 
         printf("%s\n", line);
         fclose(arch);
-
+*/
 
     // Creamos n hilos trabajador
 
