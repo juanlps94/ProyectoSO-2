@@ -66,14 +66,40 @@ void * ordenamiento(void * argumentos){
     pthread_exit(NULL);
 }
 
+
+int Comprobarlinea(char * nombre){
+    int cont=0;
+    char caracter;  // Tamaño suficiente para la mayoría de las líneas
+
+    FILE *fp;
+    fp = fopen(nombre, "r");
+        if (fp == NULL) {
+            printf("Error al abrir el archivo: %s\n", nombre);
+            return 1;
+        }
+
+        if (fgetc(fp) == EOF) {
+        printf("Error al leer la primera letra del archivo.\n");
+        return 0;
+        } else {
+            do
+            {
+                cont++;
+            } while (fgetc(fp) != EOF);
+        }
+        
+  fclose(fp);
+    return cont;
+}
+
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
-    if (argc < 3){
+   /* if (argc < 3){
         printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
-    }
+    }*/
     stats_t stats[argc - 1]; // Por defecto
 
     int cant_archivos =  argc - 1;
@@ -85,7 +111,26 @@ int main(int argc, char *argv[])
         strcpy(archivo[i].nombre, argv[i+1]); 
     }
     
+    int contador = Comprobarlinea(archivo[1].nombre);
+    printf("El numero de caracteres es %d\n" ,contador);
+
+
+   
+    char line[contador];    // Para guardar cada string
+    FILE * arch = fopen( archivo[1].nombre, "r");
+
+    fgets(line, contador,arch);
+    if (line == NULL){
+        printf("Archivo vacio.\n");
+    }
+
+        printf("%s\n", line);
+        fclose(arch);
+
+
     // Creamos n hilos trabajador
+
+   /*
     pthread_t trabajador[cant_archivos];
     for (size_t i = 0; i < cant_archivos; i++)
     {
@@ -97,6 +142,11 @@ int main(int argc, char *argv[])
     {
         pthread_join(trabajador[i], NULL);
     }
+    */
+
+
+
+
 
 	return 0;
 }    
