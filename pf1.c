@@ -48,6 +48,13 @@ void getMaxMin(Cadena * cadena, int cadena_it, args * info){
     
 }
 
+static int sort_lexicografica_decreciente(const void *p1, const void *p2){
+    Cadena * cadena1 = (Cadena *) p1;
+    Cadena * cadena2 = (Cadena *) p2;
+    return strcasecmp( cadena2->cadena, cadena1->cadena );
+    
+}
+
 // Función que ejecutaran los hilos "Trabajadores"
 void * ordenamiento(void * argumentos){
     args infoArchivo = *(args *) argumentos;
@@ -96,15 +103,24 @@ void * ordenamiento(void * argumentos){
             cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
     }
 
-    for (size_t i = 0; i < cadena_it; i++)
-    {
-        printf("%s\n", cadena[0].cadena);    
-    }
-
     getMaxMin(cadena, cadena_it, &infoArchivo);
 
     printf("Cadena más corta: \"%s\"\n", infoArchivo.stats.linea_mas_corta);
-    printf("Cadena más larga: \"%s\"\n", infoArchivo.stats.linea_mas_larga);
+    printf("Cadena más larga: \"%s\"\n\n", infoArchivo.stats.linea_mas_larga);
+
+    printf("Antes de ordenar\n");
+    for (size_t i = 0; i < cadena_it; i++)
+    {
+        printf("%s\n", cadena[i].cadena);
+    }    
+
+    qsort(cadena, cadena_it, sizeof(Cadena), sort_lexicografica_decreciente);
+
+    printf("\nDespués de ordenar\n");
+    for (size_t i = 0; i < cadena_it; i++)
+    {
+        printf("%s\n", cadena[i].cadena);
+    }
 
     free(cadena);
     //free(lineas);
