@@ -30,46 +30,69 @@ void reservarMemoria(char ** cadena, int n){
 void * ordenamiento(void * argumentos){
     args infoArchivo = *(args *) argumentos;
 
-    char ** cadenas = (char **) malloc(sizeof (char *) * 10);     // Reservamos memoria para strings de 10 en 10
-    char ** cadenas2;
-    int count = 1;
-    reservarMemoria(cadenas, count);
+    // Objetivo: Crear un array de strings que guarde las lineas del archivo
+
+    typedef struct
+    {
+        char * cadena;
+        int len;
+    }Cadena;
+
+    Cadena * cadena = malloc(sizeof (Cadena));
+    //char ** lineas = malloc(sizeof (char *));
+    //int lineas_len = 0;
+    //int lineas_it = 0;
+    int cadena_it = 0;
+    int char_it = 0;
+    FILE * fd;
+    char ch;
+
+    int max = 0;
+    int min;
     
-    char line[1024];    // Para guardar cada string
+    fd = fopen( infoArchivo.nombre, "r");
 
-    FILE * archivo = fopen( infoArchivo.nombre, "r");
-
-    fgets(line, 1024,archivo);
-    if (line == NULL){
-        printf("Archivo vacio.\n");
-        pthread_exit(NULL);
-    }
-
-    int it = 0;
-    do
-    {   
-        printf("%s\n", line);
-        strcpy(cadenas[0], line);
-        it++;
-        if (it >= 10){
-            it = 0;
-            count++;
-            cadenas2 = (char **) realloc(cadenas, count*10);
-            cadenas = cadenas2; 
-            reservarMemoria(cadenas, count);
+    cadena[cadena_it].len = 0;              // cadena_it=0, inicializamos su len a 0
+    cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(Cadena) * char_it+1);
+    while ( (ch = fgetc(fd)) !=  EOF)
+    {  
+        cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
+        if (ch == '\n')                     
+        {
+            cadena[cadena_it].cadena[char_it] = '\0';     // Terminamos la cadena en nulo
+            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
+                cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
+            }
+            char_it = 0;                                    // Reinicilizamos el iterador de caracteres
+            cadena[cadena_it].len = 0;                      // Inicializamos su len a 0
+            cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(Cadena) * char_it+1); // Reservamos memoria para el primer caracter
+            continue;
         }
-            
-    } while ( fgets(line, 1024,archivo));
-    
-    free(cadenas);
-    
+        
+        cadena[cadena_it].cadena[char_it] = ch;          // Guardamos el caracter en la linea
+        char_it++;
+        cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(Cadena) * char_it); // Reservamos memeria para un caracter más y aumentamos nos movemos a el
+    }
+/*
+    if ( ch == EOF ){
+            if (char_count > 1){ 
+                line_count++;
+                max = (char_count > max) ? char_count : max;
+            }
+    }
+*/
+    printf("%s\n", cadena[0].cadena);
+
+    free(cadena);
+    //free(lineas);
+
     pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
-    if (argc < 3){
+    if (argc < 2){
         printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
