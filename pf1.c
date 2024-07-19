@@ -108,19 +108,33 @@ void * ordenamiento(void * argumentos){
     printf("Cadena más corta: \"%s\"\n", infoArchivo.stats.linea_mas_corta);
     printf("Cadena más larga: \"%s\"\n\n", infoArchivo.stats.linea_mas_larga);
 
+/*
     printf("Antes de ordenar\n");
     for (size_t i = 0; i < cadena_it; i++)
     {
         printf("%s\n", cadena[i].cadena);
-    }    
-
+    }
+*/    
     qsort(cadena, cadena_it, sizeof(Cadena), sort_lexicografica_decreciente);
-
+/*
     printf("\nDespués de ordenar\n");
     for (size_t i = 0; i < cadena_it; i++)
     {
         printf("%s\n", cadena[i].cadena);
     }
+*/
+
+    strcat(infoArchivo.nombre, ".sorted");
+    FILE * fd_out = fopen( infoArchivo.nombre, "w");
+
+    for (size_t i = 0; i < cadena_it; i++)
+    {
+        fputs(cadena[i].cadena, fd_out);
+        if ( i != cadena_it-1 )
+            fputs("\n", fd_out); 
+    }
+     
+    printf("This worker thread writes %d lines to “%s”\n", cadena_it, infoArchivo.nombre);
 
     free(cadena);
     //free(lineas);
