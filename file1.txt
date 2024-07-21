@@ -1,6 +1,8 @@
-a Hola, Mundo!
-b Hola, Mundo!
-c Hola, Mundo! 
-d Hola, Mundo! Desde C
+Hola, Mundo!
+Ni Hao, World!
+Hola, Mundo!
+Hola, Mundo! Desde C
 
-e Hola, Mundo!
+Hola, Mundo!
+
+Que tal, Mundo!

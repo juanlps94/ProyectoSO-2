@@ -127,14 +127,21 @@ void * ordenamiento(void * argumentos){
     strcat(infoArchivo.nombre, ".sorted");
     FILE * fd_out = fopen( infoArchivo.nombre, "w");
 
+    int descartadas = 0; // Cuentas las lineas descartadas por repeticion
     for (size_t i = 0; i < cadena_it; i++)
     {
+        if ( i > 0 && ! (strcasecmp( cadena[i].cadena, cadena[i-1].cadena )) ){
+            descartadas++;
+            continue;
+        }
         fputs(cadena[i].cadena, fd_out);
         if ( i != cadena_it-1 )
             fputs("\n", fd_out); 
+        
     }
      
-    printf("This worker thread writes %d lines to “%s”\n", cadena_it, infoArchivo.nombre);
+    // "Hola Mundo" y "Mundo Mundo " son consideradas distintas debido al espacio del final
+    printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo.nombre);
 
     free(cadena);
     //free(lineas);
