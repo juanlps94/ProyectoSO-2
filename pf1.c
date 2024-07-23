@@ -34,9 +34,9 @@ void getMaxMin(Cadena * cadena, int cadena_it, args * info){
     int min = 0;
     for (size_t i = 1; i < cadena_it; i++)
     {
-        if (strlen(cadena[i].cadena) > strlen(cadena[i-1].cadena)  )
+        if (strlen(cadena[i].cadena) > strlen(cadena[max].cadena)  )
             max = i;
-        if (strlen(cadena[i].cadena) < strlen(cadena[i-1].cadena)  )
+        if (strlen(cadena[i].cadena) < strlen(cadena[min].cadena)  )
             min = i;
     }
 
@@ -44,8 +44,7 @@ void getMaxMin(Cadena * cadena, int cadena_it, args * info){
     info->stats.linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
 
     strcpy(info->stats.linea_mas_corta, cadena[min].cadena);
-    strcpy(info->stats.linea_mas_larga, cadena[max].cadena);
-    
+    strcpy(info->stats.linea_mas_larga, cadena[max].cadena);    
 }
 
 static int sort_lexicografica_decreciente(const void *p1, const void *p2){
@@ -82,7 +81,7 @@ void * ordenamiento(void * argumentos){
         cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
         if (ch == '\n')                     
         {
-            cadena[cadena_it].cadena[char_it] = '\0';     // Terminamos la cadena en nulo
+            cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
             if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
                 cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
                 cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
@@ -152,7 +151,7 @@ void * ordenamiento(void * argumentos){
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
-    if (argc < 2){
+    if (argc < 2){  // Cambiar a 3
         printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
