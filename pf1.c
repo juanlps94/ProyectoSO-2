@@ -18,31 +18,44 @@ typedef struct
 }args;
 
 typedef struct
+{
+    args archivo1;
+    args archivo2;
+    args * arreglo;
+    int indice_nuevo_archivo;
+}args_concatenacion;
+
+typedef struct
     {
         char * cadena;
         int len;
 }Cadena;
 
+// Busca la cadena más larga y más corta y actualiza el stat del archivo según corresponda
 void getMaxMin(Cadena * cadena, int cadena_it, args * info){
-    if (cadena_it == 0){
+    // Si el archivo esta vacio 
+    if (cadena_it == 0) {
         info->stats.lineas_ordenadas = cadena_it;
         strcpy(info->stats.linea_mas_corta, "");
         strcpy(info->stats.linea_mas_larga, "");
         return ;
     }
+    // Hacemos la comparación usando los indices, asumimos que cadena[0].cadena es la cadena
+    // más larga y la más corta, comparamos con el resto de cadenas y vamos actualizando max y min según
+    // corresponda
     int max = 0;
     int min = 0;
-    for (size_t i = 1; i < cadena_it; i++)
-    {
+    for (size_t i = 1; i < cadena_it; i++) {
         if (strlen(cadena[i].cadena) > strlen(cadena[max].cadena)  )
             max = i;
         if (strlen(cadena[i].cadena) < strlen(cadena[min].cadena)  )
             min = i;
     }
 
+    // Reserva de memoria para almacenar las lineas más larga y más corta
     info->stats.linea_mas_corta = malloc ( sizeof(char) * strlen(cadena[min].cadena));
     info->stats.linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
-
+    // Actualizamos los stats correspondiente
     strcpy(info->stats.linea_mas_corta, cadena[min].cadena);
     strcpy(info->stats.linea_mas_larga, cadena[max].cadena);    
 }
@@ -51,7 +64,6 @@ static int sort_lexicografica_decreciente(const void *p1, const void *p2){
     Cadena * cadena1 = (Cadena *) p1;
     Cadena * cadena2 = (Cadena *) p2;
     return strcasecmp( cadena2->cadena, cadena1->cadena );
-    
 }
 
 // Función que ejecutaran los hilos "Trabajadores"
@@ -61,9 +73,6 @@ void * ordenamiento(void * argumentos){
     // Objetivo: Crear un array de strings que guarde las lineas del archivo
 
     Cadena * cadena = malloc(sizeof (Cadena));
-    //char ** lineas = malloc(sizeof (char *));
-    //int lineas_len = 0;
-    //int lineas_it = 0;
     int cadena_it = 0;
     int char_it = 0;
     FILE * fd;
@@ -148,10 +157,64 @@ void * ordenamiento(void * argumentos){
     pthread_exit(NULL);
 }
 
+// Función que ejecutaran los hilos "concatenador"
+void * concatenacion_thread( void * argumentos){
+    args_concatenacion info_concatenacion = *(args_concatenacion *) argumentos;
+
+    pthread_exit(NULL);
+};
+
+// Recibe un arreglo de "args" y los concatena los archivos que referencian en pares usando hilos que
+// ejecutan "concatenacion_thread" generando un nuevo arreglo de "args" y repitiendo el proceso de forma
+// recursiva hasta tener un unico archivo referenciado
+void concatenacion_recursiva(args * archivos, int num_archivos){
+
+    // Caso base
+    if( num_archivos == 1 )
+        return;
+
+    int iteraciones = num_archivos / 2; 
+    int cant_archivos_generados = iteraciones + (num_archivos % 2);
+    args archivo_aux[cant_archivos_generados];
+    // Indices
+    int indice_archivo = 0;
+    //int indice_archivo_aux = 0;
+    
+    // Hilos 
+    pthread_t concatenador[iteraciones];
+
+    args_concatenacion info[iteraciones];
+    
+    for (size_t i = 0; i < iteraciones; i++)
+    {
+        // Llamada a concatenacion_thread con argumentos (archivo 1, archivo2 , archivo_aux, indice_nuevo_archivo)
+        // Preparamos los argumetos que se le pasarán al hilo
+        info[i].archivo1 = archivos[indice_archivo];
+        info[i].archivo2 = archivos[indice_archivo + 1];
+        info[i].arreglo = archivo_aux;
+        info[i].indice_nuevo_archivo = i;
+        pthread_create( concatenador[i], NULL, concatenacion_thread, &info[i] );
+        indice_archivo += 2;
+    } 
+
+    // Esperamos la terminacion de los hilo "concatenador"
+    for (size_t i = 0; i < iteraciones; i++) {
+        pthread_join( concatenador[i], NULL );
+    }
+
+    // Si la cantidad de archivos es impar, entonces queda uno sin concatenar. Lo añadimos al final del nuevo arreglo.
+    if ( (num_archivos % 2) != 0 ){ 
+        archivo_aux[cant_archivos_generados-1] = archivos[num_archivos-1];
+    } 
+
+    concatenacion_recursiva(archivo_aux, cant_archivos_generados);
+
+}
+
 int main(int argc, char *argv[])
 {
     // Comprobamos si el número de argumentos es correcto
-    if (argc < 2){  // Cambiar a 3
+    if (argc < 2) {  // Cambiar a 3
         printf("Error: Muy pocos argumentos.\n");
         exit(0);
         //error(0); // ?
@@ -161,25 +224,24 @@ int main(int argc, char *argv[])
     int cant_archivos =  argc - 1;
     args archivo[cant_archivos];
     
-    // Guardamos el nombre de cada archivo en su correspondiente estrucuta
-    for (size_t i = 0; i < cant_archivos; i++)
-    {
+    // Guardamos el nombre de cada archivo en su correspondiente estructura
+    for (size_t i = 0; i < cant_archivos; i++) {
         strcpy(archivo[i].nombre, argv[i+1]); 
     }
-    
     // Creamos n hilos trabajador
     pthread_t trabajador[cant_archivos];
-    for (size_t i = 0; i < cant_archivos; i++)
-    {
+    for (size_t i = 0; i < cant_archivos; i++) { 
         pthread_create(&trabajador[i], NULL, ordenamiento, &archivo[i]);
     }
 
-    // Esperamos la terminación de todos los hilos
-    for (size_t i = 0; i < cant_archivos; i++)
-    {
+    // Esperamos la terminación de todos los hilos trabajador
+    for (size_t i = 0; i < cant_archivos; i++) {
         pthread_join(trabajador[i], NULL);
     }
 
+    concatenacion_recursiva(archivo, cant_archivos);
+
 	return 0;
 }    
-        
+
+
