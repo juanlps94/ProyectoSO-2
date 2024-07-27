@@ -1,4 +1,3 @@
-//
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -14,14 +13,17 @@
 typedef struct
 {
     char nombre[100];
-    stats_t stats;
+    stats_t * stats;
 }args;
 
 typedef struct
 {
-    args archivo1;
-    args archivo2;
-    args * arreglo;
+    FILE * archivo1;
+    FILE * archivo2;
+    stats_t stats_f1;
+    stats_t stats_f2;  
+    FILE ** arreglo;
+    stats_t * stats;
     int indice_nuevo_archivo;
 }args_concatenacion;
 
@@ -33,11 +35,11 @@ typedef struct
 
 // Busca la cadena más larga y más corta y actualiza el stat del archivo según corresponda
 void getMaxMin(Cadena * cadena, int cadena_it, args * info){
+    info->stats->lineas_ordenadas = cadena_it;
     // Si el archivo esta vacio 
     if (cadena_it == 0) {
-        info->stats.lineas_ordenadas = cadena_it;
-        strcpy(info->stats.linea_mas_corta, "");
-        strcpy(info->stats.linea_mas_larga, "");
+        strcpy(info->stats->linea_mas_corta, "");
+        strcpy(info->stats->linea_mas_larga, "");
         return ;
     }
     // Hacemos la comparación usando los indices, asumimos que cadena[0].cadena es la cadena
@@ -53,11 +55,11 @@ void getMaxMin(Cadena * cadena, int cadena_it, args * info){
     }
 
     // Reserva de memoria para almacenar las lineas más larga y más corta
-    info->stats.linea_mas_corta = malloc ( sizeof(char) * strlen(cadena[min].cadena));
-    info->stats.linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
+    info->stats->linea_mas_corta = malloc ( sizeof(char) * strlen(cadena[min].cadena));
+    info->stats->linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
     // Actualizamos los stats correspondiente
-    strcpy(info->stats.linea_mas_corta, cadena[min].cadena);
-    strcpy(info->stats.linea_mas_larga, cadena[max].cadena);    
+    strcpy(info->stats->linea_mas_corta, cadena[min].cadena);
+    strcpy(info->stats->linea_mas_larga, cadena[max].cadena);    
 }
 
 static int sort_lexicografica_decreciente(const void *p1, const void *p2){
@@ -68,7 +70,7 @@ static int sort_lexicografica_decreciente(const void *p1, const void *p2){
 
 // Función que ejecutaran los hilos "Trabajadores"
 void * ordenamiento(void * argumentos){
-    args infoArchivo = *(args *) argumentos;
+    args * infoArchivo = (args *) argumentos;
 
     // Objetivo: Crear un array de strings que guarde las lineas del archivo
 
@@ -81,10 +83,14 @@ void * ordenamiento(void * argumentos){
     int max;
     int min;
     
-    fd = fopen( infoArchivo.nombre, "r");
+    fd = fopen( infoArchivo->nombre, "r");
 
     cadena[cadena_it].len = 0;              // cadena_it=0, inicializamos su len a 0
-    cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(Cadena) * char_it+1);
+    cadena[cadena_it].cadena = malloc(sizeof(Cadena) * char_it+1);
+    if (cadena[cadena_it].cadena == NULL) {    
+        fprintf(stderr, "¡No se pudo reservar memoria!\n");
+        exit(-1);
+    }
     while ( (ch = fgetc(fd)) !=  EOF)
     {  
         cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
@@ -111,10 +117,7 @@ void * ordenamiento(void * argumentos){
             cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
     }
 
-    getMaxMin(cadena, cadena_it, &infoArchivo);
-
-   // printf("Cadena más corta: \"%s\"\n", infoArchivo.stats.linea_mas_corta);
-   // printf("Cadena más larga: \"%s\"\n\n", infoArchivo.stats.linea_mas_larga);
+    getMaxMin(cadena, cadena_it, infoArchivo);
 
 /*
     printf("Antes de ordenar\n");
@@ -132,8 +135,8 @@ void * ordenamiento(void * argumentos){
     }
 */
 
-    strcat(infoArchivo.nombre, ".sorted");
-    FILE * fd_out = fopen( infoArchivo.nombre, "w");
+    strcat(infoArchivo->nombre, ".sorted");
+    FILE * fd_out = fopen( infoArchivo->nombre, "w");
 
     int descartadas = 0; // Cuentas las lineas descartadas por repeticion
     for (size_t i = 0; i < cadena_it; i++)
@@ -145,76 +148,75 @@ void * ordenamiento(void * argumentos){
         fputs(cadena[i].cadena, fd_out);
         if ( i != cadena_it-1 )
             fputs("\n", fd_out); 
-        
     }
      
     // "Hola Mundo" y "Mundo Mundo " son consideradas distintas debido al espacio del final
-    printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo.nombre);
+    printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo->nombre);
+    // printf("Cadena más corta: \"%s\"\n", infoArchivo->stats.linea_mas_corta);
+    // printf("Cadena más larga: \"%s\"\n\n", infoArchivo->stats.linea_mas_larga);
 
-    //free(cadena);
-
+    // free(cadena);
     pthread_exit(NULL);
 }
 
 // Recibe un arreglo de "args" y los concatena los archivos que referencian en pares usando hilos que
 // ejecutan "concatenacion_thread" generando un nuevo arreglo de "args" y repitiendo el proceso de forma
 
-// Función que ejecutaran los hilos "concatenador"
-void * concatenacion_thread (void * argumentos){  
-    args_concatenacion * info_concatenacion = (args_concatenacion *) argumentos;
-    args nuevoArch = info_concatenacion->archivo1;
-    info_concatenacion->arreglo[0] = nuevoArch;
-
-    (info_concatenacion -> archivo1).stats.linea_mas_larga = malloc(  sizeof(char) * 50 );
-
-    printf("LINEA MAS LARGA DEL ARCHIVO1 EN EL STATS DESPUES DE LA CONCAT: %s\n\n",info_concatenacion->archivo1.stats.linea_mas_larga);
-
-
-
+void * concatenacion_thread (void * argumentos){
+    // file_1, file_2, stats_f1, stats_f2, stats, indice
+    args_concatenacion * info = (args_concatenacion *) argumentos; 
 
     int linRep = 0;
-    FILE * fp1;
-    FILE * fp2;
-    fp1 = fopen (info_concatenacion -> archivo1.nombre,"r");
+    FILE * fp1 = info->archivo1;
+    FILE * fp2 = info->archivo2;
+    size_t linea_arch1_len = strlen(info->stats_f1.linea_mas_larga); // Largo maximo de linea para archivo 1
+    size_t linea_arch2_len = strlen(info->stats_f2.linea_mas_larga); // Largo maximo de linea para archivo 2
 
-    int linea = strlen(info_concatenacion -> archivo1.stats.linea_mas_larga);
-
-   
+    char ** linea_f1 = malloc( sizeof(char*) * info->stats_f1.lineas_ordenadas);
+    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++)
+    {
+        linea_f1[i] = malloc ( sizeof(char) * linea_arch1_len);
+    }
     
 
-
-
-    //printf("El nombre del Primer archivo %s\n",info_concatenacion->archivo1.);
-    printf("El nombre del Segundo archivo %s\n",info_concatenacion->archivo2.nombre);
+    FILE * new_file = tmpfile();
+    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++)
+    {
+        fgets(linea_f1[i], linea_arch1_len-1, fp1);
+        fputs(linea_f1[i], new_file);
+    }
 };
 
 // recursiva hasta tener un unico archivo referenciado
-void concatenacion_recursiva(args * archivos, int num_archivos){
+void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
 
     // Caso base
     if( num_archivos == 1 )
         return;
 
-    int iteraciones = num_archivos / 2; 
-    int cant_archivos_generados = iteraciones + (num_archivos % 2);
-    args archivo_aux[cant_archivos_generados];
+    int iteraciones = num_archivos / 2;     // Cuantas uniones se harán (por par)
+    int cant_archivos_generados = iteraciones + (num_archivos % 2);    // Las uniones más el archivo sobrante, de haberlo.
+    FILE * archivo_aux[cant_archivos_generados];
+    stats_t arr_stats[cant_archivos_generados];
     // Indices
     int indice_archivo = 0;
-    //int indice_archivo_aux = 0;
-    
     // Hilos 
     pthread_t concatenador[iteraciones];
-
+    // Argumentos
     args_concatenacion info[iteraciones];
     
     for (size_t i = 0; i < iteraciones; i++)
     {
         // Llamada a concatenacion_thread con argumentos (archivo 1, archivo2 , archivo_aux, indice_nuevo_archivo)
         // Preparamos los argumetos que se le pasarán al hilo
-        info[i].archivo1 = archivos[indice_archivo];
-        info[i].archivo2 = archivos[indice_archivo + 1];
+        info[i].archivo1 = files[indice_archivo];
+        info[i].archivo2 = files[indice_archivo + 1];
+        info[i].stats_f1 = stats[indice_archivo];
+        info[i].stats_f2 = stats[indice_archivo + 1];
         info[i].arreglo = archivo_aux;
+        info[i].stats = arr_stats;
         info[i].indice_nuevo_archivo = i;
+        
         pthread_create( &concatenador[i], NULL, concatenacion_thread, &info[i] );
         indice_archivo += 2;
     } 
@@ -226,16 +228,12 @@ void concatenacion_recursiva(args * archivos, int num_archivos){
 
     // Si la cantidad de archivos es impar, entonces queda uno sin concatenar. Lo añadimos al final del nuevo arreglo.
     if ( (num_archivos % 2) != 0 ){ 
-        archivo_aux[cant_archivos_generados-1] = archivos[num_archivos-1];
+        archivo_aux[cant_archivos_generados-1] = files[num_archivos-1];
     } 
-    
-    printf("linea mas larga ANTES de LLAMADA RECURSIVA es: %s\n", archivo_aux[0].stats.linea_mas_larga);
 
-    concatenacion_recursiva(archivo_aux, cant_archivos_generados);
+    //concatenacion_recursiva(archivo_aux, cant_archivos_generados);
 
 }
-
-
 
 int main(int argc, char *argv[])
 {
@@ -252,7 +250,8 @@ int main(int argc, char *argv[])
     
     // Guardamos el nombre de cada archivo en su correspondiente estructura
     for (size_t i = 0; i < cant_archivos; i++) {
-        strcpy(archivo[i].nombre, argv[i+1]); 
+        strcpy(archivo[i].nombre, argv[i+1]);
+        archivo[i].stats = & stats[i];
     }
     // Creamos n hilos trabajador
     pthread_t trabajador[cant_archivos];
@@ -265,14 +264,20 @@ int main(int argc, char *argv[])
         pthread_join(trabajador[i], NULL);
     }
 
-
-    for(int i=0;i<cant_archivos;i++){
+    /*for(int i=0;i<cant_archivos;i++){
         strcat(archivo[i].nombre,".sorted");
-    }
+    }*/
 
-    concatenacion_recursiva(archivo, cant_archivos);
+    FILE * aux_files[cant_archivos];
+    for (size_t i = 0; i < cant_archivos; i++)
+    {
+        aux_files[i] = fopen( archivo[i].nombre, "r" );
+        if (aux_files[i] == NULL){
+            printf("Error al abrir archivo.\n");
+        }
+    }
+    
+    concatenacion_recursiva(aux_files, stats, cant_archivos);
 
 	return 0;
 }    
-
-
