@@ -9,6 +9,8 @@
 // incluye la cabecera
 #include "pf1.h"
 
+#define not !
+
 // args guarda argumentos para los hilos
 typedef struct
 {
@@ -103,7 +105,7 @@ void * ordenamiento(void * argumentos){
             }
             char_it = 0;                                    // Reinicilizamos el iterador de caracteres
             cadena[cadena_it].len = 0;                      // Inicializamos su len a 0
-            cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el primer caracter
+            cadena[cadena_it].cadena = malloc( sizeof(char) ); // Reservamos memoria para el primer caracter
             continue;
         }
         
@@ -163,36 +165,72 @@ void * ordenamiento(void * argumentos){
 // ejecutan "concatenacion_thread" generando un nuevo arreglo de "args" y repitiendo el proceso de forma
 
 void * concatenacion_thread (void * argumentos){
-    // file_1, file_2, stats_f1, stats_f2, stats, indice
+    // file_1, file_2, stats_f1, stats_f2, arreglo, stats, indice
     args_concatenacion * info = (args_concatenacion *) argumentos; 
 
-    int linRep = 0;
+    int lineas_repetidas = 0;
     FILE * fp1 = info->archivo1;
     FILE * fp2 = info->archivo2;
     size_t linea_arch1_len = strlen(info->stats_f1.linea_mas_larga); // Largo maximo de linea para archivo 1
     size_t linea_arch2_len = strlen(info->stats_f2.linea_mas_larga); // Largo maximo de linea para archivo 2
 
     char ** linea_f1 = malloc( sizeof(char*) * info->stats_f1.lineas_ordenadas);
-    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++)
-    {
+    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++) {
         linea_f1[i] = malloc ( sizeof(char) * linea_arch1_len);
     }
     
+    char ** linea_f2 = malloc( sizeof(char*) * info->stats_f2.lineas_ordenadas);
+    for (size_t i = 0; i < info->stats_f2.lineas_ordenadas; i++) {
+        linea_f2[i] = malloc ( sizeof(char) * linea_arch2_len);
+    }
 
     FILE * new_file = tmpfile();
-    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++)
-    {
+    // Escribimos todo el archivo 1 en el nuevo archivo
+    for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++) {
         fgets(linea_f1[i], linea_arch1_len-1, fp1);
         fputs(linea_f1[i], new_file);
     }
+    // Comparamos el archivo 2 con el archivo 1 en busca de lineas repetidas
+    // e escribimos en el nuevo archivo las no repetidas.
+    for (size_t i = 0; i < info->stats_f2.lineas_ordenadas; i++) {
+        fgets(linea_f2[i], linea_arch1_len-1, fp2);
+        for ( int j = 0; j < info->stats_f1.lineas_ordenadas; j++) {
+            if( not strcmp(linea_f2[i], linea_f1[j])  ){
+                fputs(linea_f2[i], new_file);
+                continue;
+            }
+            lineas_repetidas++;
+        }
+    }
+
+    // Guardamos el total de lineas despues de la fusión
+    info->stats->lineas_ordenadas = linea_arch1_len + linea_arch2_len - lineas_repetidas;
+    /*
+    // Guardamos lineas más larga del nuevo archivo
+    if ( linea_arch1_len > linea_arch2_len ) {
+        strcpy( info->stats->linea_mas_larga , info->stats_f1.linea_mas_larga);
+    }else{
+        strcpy( info->stats->linea_mas_larga , info->stats_f2.linea_mas_larga);
+    }
+    // Guardamos linea más corta del nuevo archivo
+    if ( strlen(info->stats_f1.linea_mas_corta) < strlen(info->stats_f2.linea_mas_corta)  ) {
+        strcpy( info->stats->linea_mas_corta , info->stats_f1.linea_mas_corta);
+    }else{
+        strcpy( info->stats->linea_mas_corta , info->stats_f2.linea_mas_corta);
+    }
+    */    
+    info->arreglo[info->indice_nuevo_archivo] = new_file;
+
 };
 
 // recursiva hasta tener un unico archivo referenciado
 void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
 
     // Caso base
-    if( num_archivos == 1 )
+    if( num_archivos == 1 ){
+
         return;
+    }
 
     int iteraciones = num_archivos / 2;     // Cuantas uniones se harán (por par)
     int cant_archivos_generados = iteraciones + (num_archivos % 2);    // Las uniones más el archivo sobrante, de haberlo.
@@ -230,8 +268,8 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
     if ( (num_archivos % 2) != 0 ){ 
         archivo_aux[cant_archivos_generados-1] = files[num_archivos-1];
     } 
-
-    //concatenacion_recursiva(archivo_aux, cant_archivos_generados);
+ 
+    concatenacion_recursiva(archivo_aux, stats , cant_archivos_generados);
 
 }
 
