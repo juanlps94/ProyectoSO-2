@@ -81,7 +81,7 @@ void * ordenamiento(void * argumentos){
     int char_it = 0;
     FILE * fd;
     char ch;
-
+    bool flag_espacios_inicio = true;
     int max;
     int min;
     
@@ -106,8 +106,14 @@ void * ordenamiento(void * argumentos){
             char_it = 0;                                    // Reinicilizamos el iterador de caracteres
             cadena[cadena_it].len = 0;                      // Inicializamos su len a 0
             cadena[cadena_it].cadena = malloc( sizeof(char) ); // Reservamos memoria para el primer caracter
+            flag_espacios_inicio = true;   
             continue;
         }
+        if ( (ch == ' ') && flag_espacios_inicio ) {
+            cadena[cadena_it].len = 0;    
+            continue;
+        }
+        flag_espacios_inicio = false;                
         
         cadena[cadena_it].cadena[char_it] = ch;          // Guardamos el caracter en la linea
         char_it++;
