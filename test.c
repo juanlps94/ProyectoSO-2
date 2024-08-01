@@ -14,13 +14,11 @@ void reservar(char * mem){
 }
 
 int main (){
-
-    char  * a;
-    reservar(a);
-    strncpy(a, "Hola, Mundo.",10);
-    printf("%s\n",a);
-
-
-
+    char * s[100];
+    FILE * fd =  tmpfile();
+    fprintf(fd, "Hola, mundo.\n");
+    rewind(fd);
+    fgetc(fd);
+    printf("%c\n", s);
     return 0;
 }

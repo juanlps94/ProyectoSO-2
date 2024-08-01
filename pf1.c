@@ -36,12 +36,12 @@ typedef struct
 }Cadena;
 
 // Busca la cadena más larga y más corta y actualiza el stat del archivo según corresponda
-void getMaxMin(Cadena * cadena, int cadena_it, args * info){
-    info->stats->lineas_ordenadas = cadena_it;
+void getMaxMin(Cadena * cadena, int cadena_it, stats_t * info){
+    info->lineas_ordenadas = cadena_it;
     // Si el archivo esta vacio 
     if (cadena_it == 0) {
-        strcpy(info->stats->linea_mas_corta, "");
-        strcpy(info->stats->linea_mas_larga, "");
+        strcpy(info->linea_mas_corta, "");
+        strcpy(info->linea_mas_larga, "");
         return ;
     }
     // Hacemos la comparación usando los indices, asumimos que cadena[0].cadena es la cadena
@@ -57,11 +57,11 @@ void getMaxMin(Cadena * cadena, int cadena_it, args * info){
     }
 
     // Reserva de memoria para almacenar las lineas más larga y más corta
-    info->stats->linea_mas_corta = malloc ( sizeof(char) * strlen(cadena[min].cadena));
-    info->stats->linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
+    info->linea_mas_corta = malloc ( sizeof(char) * strlen(cadena[min].cadena));
+    info->linea_mas_larga = malloc ( sizeof(char) * strlen(cadena[max].cadena));
     // Actualizamos los stats correspondiente
-    strcpy(info->stats->linea_mas_corta, cadena[min].cadena);
-    strcpy(info->stats->linea_mas_larga, cadena[max].cadena);    
+    strcpy(info->linea_mas_corta, cadena[min].cadena);
+    strcpy(info->linea_mas_larga, cadena[max].cadena);    
 }
 
 static int sort_lexicografica_decreciente(const void *p1, const void *p2){
@@ -96,28 +96,40 @@ void * ordenamiento(void * argumentos){
     while ( (ch = fgetc(fd)) !=  EOF)
     {  
         cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
-        if (ch == '\n')                     
-        {
+        if (ch == '\n') {        
+            
             cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
             if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
                 cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
                 cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
             }
+
             char_it = 0;                                    // Reinicilizamos el iterador de caracteres
             cadena[cadena_it].len = 0;                      // Inicializamos su len a 0
             cadena[cadena_it].cadena = malloc( sizeof(char) ); // Reservamos memoria para el primer caracter
             flag_espacios_inicio = true;   
             continue;
         }
+        // Eliminamos los espacios al comienzo
         if ( (ch == ' ') && flag_espacios_inicio ) {
-            cadena[cadena_it].len = 0;    
+            cadena[cadena_it].len = 0;
             continue;
         }
-        flag_espacios_inicio = false;                
-        
+        flag_espacios_inicio = false;
+
+        /*
+        // Eliminamos los espacios duplicados y al final
+        if ( cadena[cadena_it].cadena[char_it-1] = ' ' ) {  // Si el caracter anterior es ' ' y
+            if ( ch == ' ' ) {                              // el caracter actual es ' ', ignoramos el actual
+                cadena[cadena_it].len--;                    // y restauramos el contador de caracteres.
+                continue;
+            }
+        }
+        */
+                
         cadena[cadena_it].cadena[char_it] = ch;          // Guardamos el caracter en la linea
         char_it++;
-        cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el primer caracter
+        cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el siguiente caracter
     }
 
     if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
@@ -125,26 +137,96 @@ void * ordenamiento(void * argumentos){
             cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
     }
 
-    getMaxMin(cadena, cadena_it, infoArchivo);
+    getMaxMin(cadena, cadena_it, infoArchivo->stats);
 
-/*
-    printf("Antes de ordenar\n");
-    for (size_t i = 0; i < cadena_it; i++)
-    {
-        printf("%s\n", cadena[i].cadena);
-    }
-*/    
     qsort(cadena, cadena_it, sizeof(Cadena), sort_lexicografica_decreciente);
-/*
-    printf("\nDespués de ordenar\n");
-    for (size_t i = 0; i < cadena_it; i++)
-    {
-        printf("%s\n", cadena[i].cadena);
-    }
-*/
 
     strcat(infoArchivo->nombre, ".sorted");
-    FILE * fd_out = fopen( infoArchivo->nombre, "w");
+    FILE * fd_out = fopen( infoArchivo->nombre, "w+");
+
+    int descartadas = 0; // Cuentas las lineas descartadas por repeticion
+    for (size_t i = 0; i < cadena_it; i++)
+    {
+        if ( i > 0 && ! ( strcasecmp( cadena[i].cadena, cadena[i-1].cadena ) ) ) {
+            descartadas++;
+            continue;
+        }
+        fputs(cadena[i].cadena, fd_out);    // Escribimos una linea al archivo
+        if ( i != cadena_it-1 )             // Si no es la ultima  lineas ponemos un salto de linea final             
+            fputs("\n", fd_out);
+        else
+            fputs("\0", fd_out);
+    }
+     
+    printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo->nombre);
+    // printf("Cadena más larga: \"%s\"\n\n", infoArchivo->stats.linea_mas_larga);
+
+    // free(cadena);
+    pthread_exit(NULL);
+}
+
+// Función que ejecutaran los hilos de "Fusion"
+FILE * ordenamiento2(FILE * fd, stats_t * stats){
+
+    // Objetivo: Crear un array de strings que guarde las lineas del archivo
+
+    Cadena * cadena = malloc(sizeof (Cadena));
+    int cadena_it = 0;
+    int char_it = 0;
+    char ch;
+    bool flag_espacios_inicio = true;
+    int max;
+    int min;
+
+    cadena[cadena_it].len = 0;              // cadena_it=0, inicializamos su len a 0
+    cadena[cadena_it].cadena = malloc(sizeof(Cadena) * char_it+1);
+    if (cadena[cadena_it].cadena == NULL) {    
+        fprintf(stderr, "¡No se pudo reservar memoria!\n");
+        exit(-1);
+    }
+    while ( (ch = fgetc(fd)) !=  EOF)
+    {  
+        printf("ch: %c. ", ch);
+        // ch = (char) ch;
+        // printf("ch: %c\n", ch);
+        cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
+
+        if (ch == '\n') {        
+            
+            cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
+            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
+                cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
+                cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
+            }
+
+            char_it = 0;                                    // Reinicilizamos el iterador de caracteres
+            cadena[cadena_it].len = 0;                      // Inicializamos su len a 0
+            cadena[cadena_it].cadena = malloc( sizeof(char) ); // Reservamos memoria para el primer caracter
+            flag_espacios_inicio = true;   
+            continue;
+        }
+        // Eliminamos los espacios al comienzo
+        if ( (ch == ' ') && flag_espacios_inicio ) {
+            cadena[cadena_it].len = 0;
+            continue;
+        }
+        flag_espacios_inicio = false;
+                
+        cadena[cadena_it].cadena[char_it] = ch;          // Guardamos el caracter en la linea
+        char_it++;
+        cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el siguiente caracter
+    }
+
+    if (cadena[cadena_it].len > 1) {                 // Si la cadena es más larga que 1 (contando \n)
+            cadena_it++;                            // Se cuenta la linea y se pasa a la siguiente
+            cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
+    }
+
+    getMaxMin(cadena, cadena_it, stats);
+
+    qsort(cadena, cadena_it, sizeof(Cadena), sort_lexicografica_decreciente);
+
+    FILE * fd_out = tmpfile();
 
     int descartadas = 0; // Cuentas las lineas descartadas por repeticion
     for (size_t i = 0; i < cadena_it; i++)
@@ -153,30 +235,29 @@ void * ordenamiento(void * argumentos){
             descartadas++;
             continue;
         }
-        fputs(cadena[i].cadena, fd_out);
+        if (fputs(cadena[i].cadena, fd_out) == EOF) {
+            perror("Error al escribir linea");
+        }
         if ( i != cadena_it-1 )
             fputs("\n", fd_out); 
     }
-     
-    // "Hola Mundo" y "Mundo Mundo " son consideradas distintas debido al espacio del final
-    printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo->nombre);
-    // printf("Cadena más corta: \"%s\"\n", infoArchivo->stats.linea_mas_corta);
-    // printf("Cadena más larga: \"%s\"\n\n", infoArchivo->stats.linea_mas_larga);
 
-    // free(cadena);
-    pthread_exit(NULL);
+    stats->lineas_ordenadas = cadena_it-descartadas;
+    
+    pclose(fd);
+    return fd_out;
 }
+
 
 // Recibe un arreglo de "args" y los concatena los archivos que referencian en pares usando hilos que
 // ejecutan "concatenacion_thread" generando un nuevo arreglo de "args" y repitiendo el proceso de forma
 
 void * concatenacion_thread (void * argumentos){
-    // file_1, file_2, stats_f1, stats_f2, arreglo, stats, indice
+    // file_1, file_2, stats1, stats2, arreglo, stats, indice
     args_concatenacion * info = (args_concatenacion *) argumentos; 
 
-    int lineas_repetidas = 0;
-    FILE * fp1 = info->archivo1;
-    FILE * fp2 = info->archivo2;
+    FILE * fd1 = info->archivo1;
+    FILE * fd2 = info->archivo2;
     size_t linea_arch1_len = strlen(info->stats_f1.linea_mas_larga); // Largo maximo de linea para archivo 1
     size_t linea_arch2_len = strlen(info->stats_f2.linea_mas_larga); // Largo maximo de linea para archivo 2
 
@@ -190,41 +271,29 @@ void * concatenacion_thread (void * argumentos){
         linea_f2[i] = malloc ( sizeof(char) * linea_arch2_len);
     }
 
+    rewind(fd1);
+    rewind(fd2);
     FILE * new_file = tmpfile();
     // Escribimos todo el archivo 1 en el nuevo archivo
     for (size_t i = 0; i < info->stats_f1.lineas_ordenadas; i++) {
-        fgets(linea_f1[i], linea_arch1_len-1, fp1);
+        fgets(linea_f1[i], linea_arch1_len-1, fd1);
+        printf("Linea f1: %s\n", linea_f1);
         fputs(linea_f1[i], new_file);
     }
-    // Comparamos el archivo 2 con el archivo 1 en busca de lineas repetidas
-    // e escribimos en el nuevo archivo las no repetidas.
+    // Escribimos todo el archivo 2 en el nuevo archivo
     for (size_t i = 0; i < info->stats_f2.lineas_ordenadas; i++) {
-        fgets(linea_f2[i], linea_arch1_len-1, fp2);
-        for ( int j = 0; j < info->stats_f1.lineas_ordenadas; j++) {
-            if( not strcmp(linea_f2[i], linea_f1[j])  ){
-                fputs(linea_f2[i], new_file);
-                continue;
-            }
-            lineas_repetidas++;
-        }
+        fgets( linea_f2[i], linea_arch2_len-1, fd2);
+        fputs( linea_f2[i], new_file);
     }
+    rewind(new_file);
+    new_file = ordenamiento2(new_file, &info->stats[ info->indice_nuevo_archivo ]);
 
-    // Guardamos el total de lineas despues de la fusión
-    info->stats->lineas_ordenadas = linea_arch1_len + linea_arch2_len - lineas_repetidas;
-    /*
-    // Guardamos lineas más larga del nuevo archivo
-    if ( linea_arch1_len > linea_arch2_len ) {
-        strcpy( info->stats->linea_mas_larga , info->stats_f1.linea_mas_larga);
-    }else{
-        strcpy( info->stats->linea_mas_larga , info->stats_f2.linea_mas_larga);
-    }
-    // Guardamos linea más corta del nuevo archivo
-    if ( strlen(info->stats_f1.linea_mas_corta) < strlen(info->stats_f2.linea_mas_corta)  ) {
-        strcpy( info->stats->linea_mas_corta , info->stats_f1.linea_mas_corta);
-    }else{
-        strcpy( info->stats->linea_mas_corta , info->stats_f2.linea_mas_corta);
-    }
-    */    
+    int lines_file_1 = info->stats_f1.lineas_ordenadas;
+    int lines_file_2 = info->stats_f2.lineas_ordenadas;
+    int lines_merged = info->stats->lineas_ordenadas;
+
+    printf("Merged %d lines and %d into %d lines\n", lines_file_1, lines_file_2, lines_merged );
+
     info->arreglo[info->indice_nuevo_archivo] = new_file;
 
 };
@@ -234,7 +303,21 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
 
     // Caso base
     if( num_archivos == 1 ){
+        FILE * fd_final;
+        fd_final = fopen( "sorted.txt", "w+b" );
+        int linea_lenMax = strlen(stats[0].linea_mas_larga);
+        char linea[ linea_lenMax ];
 
+        if ( fd_final == NULL) {
+            perror("No se pudo abrir el archivo.\n");
+            exit(-1);
+        }
+
+        while ( ! feof(files[0]) ) {
+            fgets( linea, linea_lenMax, files[0] );
+            fputs( linea, fd_final );
+        }
+        // Imprimir cosas
         return;
     }
 
@@ -308,20 +391,22 @@ int main(int argc, char *argv[])
         pthread_join(trabajador[i], NULL);
     }
 
-    /*for(int i=0;i<cant_archivos;i++){
-        strcat(archivo[i].nombre,".sorted");
-    }*/
-
+    // for(int i=0;i<cant_archivos;i++){
+    //    strcat(archivo[i].nombre,".sorted");
+    // }
+    /*
+    char buffer[1024];
     FILE * aux_files[cant_archivos];
-    for (size_t i = 0; i < cant_archivos; i++)
-    {
-        aux_files[i] = fopen( archivo[i].nombre, "r" );
+    for (size_t i = 0; i < cant_archivos; i++) {
+        aux_files[i] = fopen( archivo[i].nombre, "r+" );
         if (aux_files[i] == NULL){
             printf("Error al abrir archivo.\n");
         }
+        fgets(buffer, 1024, aux_files[0]);
+        printf("Leido: \"%s\"", buffer);
     }
-    
-    concatenacion_recursiva(aux_files, stats, cant_archivos);
+    */  
 
+    // concatenacion_recursiva(aux_files, stats, cant_archivos);
 	return 0;
 }    

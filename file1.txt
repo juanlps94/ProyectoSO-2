@@ -1,9 +1,3 @@
-Hola, Mundo!
-g
-CHola, Mundo!
-
-Hola, Mundo! dfgfgdfgdfgdfg
-Hola, Mundo! Desde C
-sdfgsggggggggggggggggggggggdf
-Que tal, Mundo!
-Ni Hao, World!
+Hola, Mundo!  
+ Hola, Mundo! 
+  Hola, Mundo!
