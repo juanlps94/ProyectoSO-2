@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/pf1" /*""enter program name, for example ${workspaceFolder}/a.out"*/,
-            "args": ["a1.txt","a2.txt"/*,"a3.txt","a4.txt","a5.txt","a6.txt"*/ ],
+            "args": ["a1.txt","a2.txt","a3.txt","a4.txt","a5.txt","a6.txt" ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

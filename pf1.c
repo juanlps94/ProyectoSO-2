@@ -6,10 +6,14 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <semaphore.h>
 // incluye la cabecera
 #include "pf1.h"
 
 #define not !
+
+sem_t guardCont;
+int cont=0;
 
 // args guarda argumentos para los hilos
 typedef struct
@@ -148,8 +152,10 @@ void * ordenamiento(void * argumentos){
     
     infoArchivo->stats->lineas_ordenadas =  cadena_it-descartadas;
     printf("This worker thread writes %d lines to “%s”\n", cadena_it-descartadas, infoArchivo->nombre);
-    // printf("Cadena más larga: \"%s\"\n\n", infoArchivo->stats.linea_mas_larga);
 
+    sem_wait(&guardCont);
+    cont+=cadena_it;
+    sem_post(&guardCont);
     // free(cadena);
     fclose(fd);
     fclose(fd_out);
@@ -181,10 +187,7 @@ FILE * ordenamiento2(FILE * fd, stats_t * stats) {
 
         if (ch == '\n') {    
             cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
-            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
-                printf("Iteracion %d: ",j);
-                printf("%s\n",cadena[cadena_it].cadena);
-                j++;    
+            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)    
                 cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
                 cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
             }
@@ -297,6 +300,8 @@ void * concatenacion_thread (void * argumentos){
         info->stats->linea_mas_corta = malloc ( sizeof(char) * linea_arch2_len_min );
         strcpy( info->stats->linea_mas_corta, info->stats_f2.linea_mas_corta);
     }
+    
+
 
     rewind(new_file);
     new_file = ordenamiento2(new_file, &info->stats[ info->indice_nuevo_archivo ]);
@@ -325,7 +330,7 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
         fd_final = fopen( "sorted.txt", "w+" );
         int linea_lenMax = strlen(stats[0].linea_mas_larga);
         char linea[ linea_lenMax ];
-
+        
         if ( fd_final == NULL) {
             perror("No se pudo abrir el archivo.\n");
             exit(-1);
@@ -336,6 +341,10 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
             fputs( linea, fd_final );
         }
         // Imprimir cosas
+        printf("A Total of %d strings were passed as input\n",cont);
+        printf("Longest string sorted %s\n",stats->linea_mas_larga);
+        printf("Shortest string sorted %s\n",stats->linea_mas_corta); 
+
         return;
     }
 
@@ -366,7 +375,6 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
         info[i].arreglo = archivo_aux;
         info[i].stats = arr_stats[ i ];
         info[i].indice_nuevo_archivo = i;
-        
         pthread_create( &concatenador[i], NULL, concatenacion_thread, &info[i] );
         indice_archivo += 2;
     } 
@@ -375,6 +383,7 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
     for (size_t i = 0; i < iteraciones; i++) {
         pthread_join( concatenador[i], NULL );
     }
+
 
     // Si la cantidad de archivos es impar, entonces queda uno sin concatenar. Lo añadimos al final del nuevo arreglo.
     if ( (num_archivos % 2) != 0 ){ 
@@ -389,6 +398,7 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
 
 int main(int argc, char *argv[])
 {
+    sem_init(&guardCont,1,1);
     // Comprobamos si el número de argumentos es correcto
     if (argc < 2) {  // Cambiar a 3
         printf("Error: Muy pocos argumentos.\n");
@@ -416,7 +426,6 @@ int main(int argc, char *argv[])
         pthread_join(trabajador[i], NULL);
     }
 
-    char buffer[1024];
     FILE * aux_files[cant_archivos];
     for (size_t i = 0; i < cant_archivos; i++) {
         aux_files[i] = fopen( archivo[i].nombre, "r" );
