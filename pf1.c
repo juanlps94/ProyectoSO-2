@@ -93,11 +93,11 @@ void * ordenamiento(void * argumentos){
         fprintf(stderr, "¡No se pudo reservar memoria!\n");
         exit(-1);
     }
-    while ( (ch = fgetc(fd)) !=  EOF) {  
+    while ( (ch = fgetc(fd)) !=  EOF) {
         cadena[cadena_it].len++;          // Aumentamos len de la cadena en 1
-        if (ch == '\n'){     
+        if (ch == '\n'){
             cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
-            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
+            if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n) 
                 cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
                 cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
             }
@@ -117,6 +117,8 @@ void * ordenamiento(void * argumentos){
         char_it++;
         cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el siguiente caracter
     }
+
+    cadena = realloc(cadena, sizeof(Cadena) * (cadena_it));
 
     if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
             cadena_it++;                            // Se cuenta la linea y se pasa a la siguiente
@@ -173,13 +175,16 @@ FILE * ordenamiento2(FILE * fd, stats_t * stats) {
         fprintf(stderr, "¡No se pudo reservar memoria!\n");
         exit(-1);
     }
+    int j=1;
     while ( (ch = fgetc(fd)) !=  EOF)
     {  
-        cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
 
-        if (ch == '\n') {        
+        if (ch == '\n') {    
             cadena[cadena_it].cadena[char_it] = '\0';       // Terminamos la cadena en nulo
             if (cadena[cadena_it].len > 1){                 // Si la cadena es más larga que 1 (contando \n)
+                printf("Iteracion %d: ",j);
+                printf("%s\n",cadena[cadena_it].cadena);
+                j++;    
                 cadena_it++;                                // Se cuenta la linea y se pasa a la siguiente
                 cadena = realloc(cadena, sizeof(Cadena) * (cadena_it+1));
             }
@@ -190,17 +195,13 @@ FILE * ordenamiento2(FILE * fd, stats_t * stats) {
             flag_espacios_inicio = true;   
             continue;
         }
-        // Eliminamos los espacios al comienzo
-        if ( (ch == ' ') && flag_espacios_inicio ) {
-            cadena[cadena_it].len = 0;
-            continue;
-        }
-        flag_espacios_inicio = false;
-                
+                      
+        cadena[cadena_it].len++;            // Aumentamos len de la cadena en 1
         cadena[cadena_it].cadena[char_it] = ch;          // Guardamos el caracter en la linea
         char_it++;
         cadena[cadena_it].cadena = realloc(cadena[cadena_it].cadena, sizeof(char) * (char_it+1)); // Reservamos memoria para el siguiente caracter
     }
+    cadena = realloc(cadena, sizeof(Cadena) * (cadena_it));
 
     if (cadena[cadena_it].len > 1) {                 // Si la cadena es más larga que 1 (contando \n)
             cadena_it++;                            // Se cuenta la linea y se pasa a la siguiente
@@ -268,12 +269,16 @@ void * concatenacion_thread (void * argumentos){
     }
     // Escribimos todo el archivo 2 en el nuevo archivo
     rewind(fd2);
+    fputs( "\n", new_file );
+
     for (size_t i = 0; i < info->stats_f2.lineas_ordenadas; i++) {
         fgets( linea_f2[i], linea_arch2_len, fd2);
         fputs("\n", new_file);
         fputs( linea_f2[i], new_file);
     }
     
+    
+
     info->stats->lineas_ordenadas = info->stats_f1.lineas_ordenadas + info->stats_f2.lineas_ordenadas;
     if (linea_arch1_len > linea_arch2_len) {
         info->stats->linea_mas_larga = malloc ( sizeof(char) * linea_arch1_len );
@@ -303,7 +308,7 @@ void * concatenacion_thread (void * argumentos){
 
     int lines_file_1 = info->stats_f1.lineas_ordenadas;
     int lines_file_2 = info->stats_f2.lineas_ordenadas;
-    int lines_merged = info->stats->lineas_ordenadas;
+    int lines_merged = info->stats[ info->indice_nuevo_archivo ].lineas_ordenadas;
 
     printf("Merged %d lines and %d into %d lines\n", lines_file_1, lines_file_2, lines_merged );
 
@@ -338,6 +343,11 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
     int cant_archivos_generados = iteraciones + (num_archivos % 2);    // Las uniones más el archivo sobrante, de haberlo.
     FILE * archivo_aux[cant_archivos_generados];
     stats_t * arr_stats[cant_archivos_generados];
+
+    for (size_t i = 0; i < cant_archivos_generados; i++){
+        arr_stats[i] = malloc ( sizeof(stats)  );
+    }
+    
     // Indices
     int indice_archivo = 0;
     // Hilos 
@@ -354,7 +364,7 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
         info[i].stats_f1 = stats[indice_archivo];
         info[i].stats_f2 = stats[indice_archivo + 1];
         info[i].arreglo = archivo_aux;
-        info[i].stats = arr_stats; //[ i ];
+        info[i].stats = arr_stats[ i ];
         info[i].indice_nuevo_archivo = i;
         
         pthread_create( &concatenador[i], NULL, concatenacion_thread, &info[i] );
@@ -374,6 +384,8 @@ void concatenacion_recursiva(FILE ** files, stats_t * stats, int num_archivos){
     concatenacion_recursiva(archivo_aux, stats , cant_archivos_generados);
 
 }
+
+
 
 int main(int argc, char *argv[])
 {
