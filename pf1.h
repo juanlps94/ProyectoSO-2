@@ -4,8 +4,8 @@
 typedef struct
 {
     unsigned int lineas_ordenadas;
-    char linea_mas_larga[1024];
-    char linea_mas_corta[1024]; // No vacía
+    char * linea_mas_larga;
+    char * linea_mas_corta; // No vacía
 } stats_t;
 
 
